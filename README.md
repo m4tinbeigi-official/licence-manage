@@ -1,1 +1,1 @@
-# licence-manage
+# licence-manager
