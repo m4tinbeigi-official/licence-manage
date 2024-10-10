@@ -107,7 +107,7 @@ function lm_admin_page() {
         echo "<div class='updated'><p>License updated successfully!</p></div>";
     }
 
-    // Fetch all licenses
+    // Fetch all licenses after any action
     $licenses = $wpdb->get_results("SELECT * FROM $table_name");
 
     ?>
