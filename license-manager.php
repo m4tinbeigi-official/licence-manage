@@ -2,21 +2,21 @@
 /*
 Plugin Name: License Manager
 Description: Manage email and licenses, provide a shortcode to display user license.
-Version: 1.2
+Version: 1.4
 Author: Rick Sanchez
 */
 
-// Create table to store emails and licenses
+// Create a custom table to store emails and licenses
 function lm_create_table() {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'licenses';
+    $table_name = $wpdb->prefix . 'custom_licenses'; // Changed table name to avoid conflicts
     $charset_collate = $wpdb->get_charset_collate();
 
     $sql = "CREATE TABLE IF NOT EXISTS $table_name (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         email varchar(100) NOT NULL,
         license varchar(100) NOT NULL,
-        PRIMARY KEY  (id)
+        PRIMARY KEY (id)
     ) $charset_collate;";
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -27,7 +27,7 @@ add_action('after_switch_theme', 'lm_create_table');
 // Add a license
 function lm_add_license($email, $license) {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'licenses';
+    $table_name = $wpdb->prefix . 'custom_licenses'; // Use the new table name
     $wpdb->insert($table_name, [
         'email' => sanitize_email($email),
         'license' => sanitize_text_field($license)
@@ -38,10 +38,10 @@ function lm_add_license($email, $license) {
 function lm_license_shortcode() {
     if (is_user_logged_in()) {
         $current_user = wp_get_current_user();
-        $email = $current_user->user_email;
+        $email = $current_user->user_email; // Get the user's email address
 
         global $wpdb;
-        $table_name = $wpdb->prefix . 'licenses';
+        $table_name = $wpdb->prefix . 'custom_licenses'; // Use the new table name
         $license = $wpdb->get_var($wpdb->prepare("SELECT license FROM $table_name WHERE email = %s", $email));
 
         if ($license) {
@@ -64,7 +64,7 @@ function lm_license_shortcode() {
             <?php
             return ob_get_clean(); // Return the buffered content
         }
-        return "No license found for your email.";
+        return "No license found for your account.";
     }
     return "Please log in to view your license.";
 }
@@ -78,16 +78,26 @@ add_action('admin_menu', 'lm_add_admin_menu');
 
 // Admin page for adding, importing, and managing licenses
 function lm_admin_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die('You do not have sufficient permissions to access this page.'); // Check if the user is an admin
+    }
+
     global $wpdb;
-    $table_name = $wpdb->prefix . 'licenses';
+    $table_name = $wpdb->prefix . 'custom_licenses'; // Use the new table name
 
     // Handle add, edit, and delete actions
     if (isset($_POST['lm_add_license'])) {
         if (!wp_verify_nonce($_POST['lm_add_license_nonce'], 'lm_add_license_action')) {
             die('Security check failed');
         }
-        lm_add_license($_POST['lm_email'], $_POST['lm_license']);
-        echo "<div class='updated'><p>License added successfully!</p></div>";
+
+        // Check if email is provided
+        if (empty($_POST['lm_email'])) {
+            echo "<div class='error'><p>Email is required!</p></div>";
+        } else {
+            lm_add_license($_POST['lm_email'], $_POST['lm_license']);
+            echo "<div class='updated'><p>License added successfully!</p></div>";
+        }
     }
 
     if (isset($_POST['lm_delete_license'])) {
@@ -101,9 +111,8 @@ function lm_admin_page() {
             die('Security check failed');
         }
         $id = intval($_POST['license_id']);
-        $email = sanitize_email($_POST['lm_email']);
         $license = sanitize_text_field($_POST['lm_license']);
-        $wpdb->update($table_name, ['email' => $email, 'license' => $license], ['id' => $id]);
+        $wpdb->update($table_name, ['license' => $license], ['id' => $id]);
         echo "<div class='updated'><p>License updated successfully!</p></div>";
     }
 
@@ -114,7 +123,7 @@ function lm_admin_page() {
     <div class="wrap">
         <h1>License Manager</h1>
 
-        <h2>Add Single License</h2>
+        <h2>Add License</h2>
         <form method="post">
             <?php wp_nonce_field('lm_add_license_action', 'lm_add_license_nonce'); ?>
             <label for="lm_email">Email:</label>
@@ -123,19 +132,6 @@ function lm_admin_page() {
             <input type="text" name="lm_license" required>
             <input type="submit" name="lm_add_license" value="Add License" class="button button-primary">
         </form>
-
-        <h2>Import Licenses from CSV</h2>
-        <form method="post" enctype="multipart/form-data">
-            <?php wp_nonce_field('lm_import_csv_action', 'lm_import_csv_nonce'); ?>
-            <input type="file" name="lm_csv_file" accept=".csv" required>
-            <input type="submit" name="lm_import_csv" value="Import Licenses" class="button button-primary">
-        </form>
-
-        <h2>Download Sample CSV</h2>
-        <p>
-            You can download a sample CSV file to help you format your license data:
-            <a href="<?php echo plugin_dir_url(__FILE__) . 'sample.csv'; ?>" class="button">Download Sample CSV</a>
-        </p>
 
         <h2>Manage Licenses</h2>
         <table class="widefat">
@@ -156,7 +152,6 @@ function lm_admin_page() {
                                 <form method="post" style="display:inline;">
                                     <?php wp_nonce_field('lm_edit_license_action', 'lm_edit_license_nonce'); ?>
                                     <input type="hidden" name="license_id" value="<?php echo intval($license->id); ?>">
-                                    <input type="email" name="lm_email" value="<?php echo esc_attr($license->email); ?>" required>
                                     <input type="text" name="lm_license" value="<?php echo esc_attr($license->license); ?>" required>
                                     <input type="submit" name="lm_edit_license" value="Edit" class="button button-secondary">
                                 </form>
