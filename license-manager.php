@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: License Manager
-Description: Manage email and licenses, provide a shortcode to display user license.
-Version: 1.4
+Description: Manage email and licenses, provide a shortcode to display user licenses.
+Version: 1.5
 Author: Rick Sanchez
 */
 
@@ -34,7 +34,7 @@ function lm_add_license($email, $license) {
     ]);
 }
 
-// Shortcode to display user license
+// Shortcode to display user licenses
 function lm_license_shortcode() {
     if (is_user_logged_in()) {
         $current_user = wp_get_current_user();
@@ -42,31 +42,41 @@ function lm_license_shortcode() {
 
         global $wpdb;
         $table_name = $wpdb->prefix . 'custom_licenses'; // Use the new table name
-        $license = $wpdb->get_var($wpdb->prepare("SELECT license FROM $table_name WHERE email = %s", $email));
+        $licenses = $wpdb->get_results($wpdb->prepare("SELECT license FROM $table_name WHERE email = %s", $email));
 
-        if ($license) {
+        if ($licenses) {
             ob_start(); // Start output buffering
             ?>
             <div>
-                Your License: <span id="license-text"><?php echo esc_html($license); ?></span>
-                <button id="copy-license" style="margin-left: 10px;">Copy</button>
+                <h3>Your Licenses:</h3>
+                <ul>
+                    <?php foreach ($licenses as $license): ?>
+                        <li>
+                            <span id="license-text"><?php echo esc_html($license->license); ?></span>
+                            <button class="copy-license" style="margin-left: 10px;">Copy</button>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
             </div>
             <script>
-                document.getElementById('copy-license').onclick = function() {
-                    var licenseText = document.getElementById('license-text').innerText;
-                    navigator.clipboard.writeText(licenseText).then(function() {
-                        alert('License copied to clipboard!');
-                    }, function(err) {
-                        alert('Failed to copy: ', err);
-                    });
-                };
+                const copyButtons = document.querySelectorAll('.copy-license');
+                copyButtons.forEach(button => {
+                    button.onclick = function() {
+                        const licenseText = this.previousElementSibling.innerText;
+                        navigator.clipboard.writeText(licenseText).then(function() {
+                            alert('License copied to clipboard!');
+                        }, function(err) {
+                            alert('Failed to copy: ', err);
+                        });
+                    };
+                });
             </script>
             <?php
             return ob_get_clean(); // Return the buffered content
         }
-        return "No license found for your account.";
+        return "No licenses found for your account.";
     }
-    return "Please log in to view your license.";
+    return "Please log in to view your licenses.";
 }
 add_shortcode('user_license', 'lm_license_shortcode');
 
