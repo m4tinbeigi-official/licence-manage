@@ -2,7 +2,7 @@
 /*
 Plugin Name: License Manager
 Description: Manage email and licenses, provide a shortcode to display user license.
-Version: 1.1
+Version: 1.2
 Author: Rick Sanchez
 */
 
@@ -44,7 +44,27 @@ function lm_license_shortcode() {
         $table_name = $wpdb->prefix . 'licenses';
         $license = $wpdb->get_var($wpdb->prepare("SELECT license FROM $table_name WHERE email = %s", $email));
 
-        return $license ? "Your License: " . esc_html($license) : "No license found for your email.";
+        if ($license) {
+            ob_start(); // Start output buffering
+            ?>
+            <div>
+                Your License: <span id="license-text"><?php echo esc_html($license); ?></span>
+                <button id="copy-license" style="margin-left: 10px;">Copy</button>
+            </div>
+            <script>
+                document.getElementById('copy-license').onclick = function() {
+                    var licenseText = document.getElementById('license-text').innerText;
+                    navigator.clipboard.writeText(licenseText).then(function() {
+                        alert('License copied to clipboard!');
+                    }, function(err) {
+                        alert('Failed to copy: ', err);
+                    });
+                };
+            </script>
+            <?php
+            return ob_get_clean(); // Return the buffered content
+        }
+        return "No license found for your email.";
     }
     return "Please log in to view your license.";
 }
