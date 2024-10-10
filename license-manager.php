@@ -76,12 +76,44 @@ function lm_add_admin_menu() {
 }
 add_action('admin_menu', 'lm_add_admin_menu');
 
-// Admin page for adding and importing licenses
+// Admin page for adding, importing, and managing licenses
 function lm_admin_page() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'licenses';
+
+    // Handle add, edit, and delete actions
+    if (isset($_POST['lm_add_license'])) {
+        if (!wp_verify_nonce($_POST['lm_add_license_nonce'], 'lm_add_license_action')) {
+            die('Security check failed');
+        }
+        lm_add_license($_POST['lm_email'], $_POST['lm_license']);
+        echo "<div class='updated'><p>License added successfully!</p></div>";
+    }
+
+    if (isset($_POST['lm_delete_license'])) {
+        $id = intval($_POST['license_id']);
+        $wpdb->delete($table_name, ['id' => $id]);
+        echo "<div class='updated'><p>License deleted successfully!</p></div>";
+    }
+
+    if (isset($_POST['lm_edit_license'])) {
+        if (!wp_verify_nonce($_POST['lm_edit_license_nonce'], 'lm_edit_license_action')) {
+            die('Security check failed');
+        }
+        $id = intval($_POST['license_id']);
+        $email = sanitize_email($_POST['lm_email']);
+        $license = sanitize_text_field($_POST['lm_license']);
+        $wpdb->update($table_name, ['email' => $email, 'license' => $license], ['id' => $id]);
+        echo "<div class='updated'><p>License updated successfully!</p></div>";
+    }
+
+    // Fetch all licenses
+    $licenses = $wpdb->get_results("SELECT * FROM $table_name");
+
     ?>
     <div class="wrap">
         <h1>License Manager</h1>
-        
+
         <h2>Add Single License</h2>
         <form method="post">
             <?php wp_nonce_field('lm_add_license_action', 'lm_add_license_nonce'); ?>
@@ -104,40 +136,44 @@ function lm_admin_page() {
             You can download a sample CSV file to help you format your license data:
             <a href="<?php echo plugin_dir_url(__FILE__) . 'sample.csv'; ?>" class="button">Download Sample CSV</a>
         </p>
+
+        <h2>Manage Licenses</h2>
+        <table class="widefat">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>License</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($licenses): ?>
+                    <?php foreach ($licenses as $license): ?>
+                        <tr>
+                            <td><?php echo esc_html($license->email); ?></td>
+                            <td><?php echo esc_html($license->license); ?></td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    <?php wp_nonce_field('lm_edit_license_action', 'lm_edit_license_nonce'); ?>
+                                    <input type="hidden" name="license_id" value="<?php echo intval($license->id); ?>">
+                                    <input type="email" name="lm_email" value="<?php echo esc_attr($license->email); ?>" required>
+                                    <input type="text" name="lm_license" value="<?php echo esc_attr($license->license); ?>" required>
+                                    <input type="submit" name="lm_edit_license" value="Edit" class="button button-secondary">
+                                </form>
+                                <form method="post" style="display:inline;">
+                                    <input type="hidden" name="license_id" value="<?php echo intval($license->id); ?>">
+                                    <input type="submit" name="lm_delete_license" value="Delete" class="button button-danger" onclick="return confirm('Are you sure you want to delete this license?');">
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="3">No licenses found.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
     <?php
-
-    // Process adding a license
-    if (isset($_POST['lm_add_license'])) {
-        if (!wp_verify_nonce($_POST['lm_add_license_nonce'], 'lm_add_license_action')) {
-            die('Security check failed');
-        }
-        lm_add_license($_POST['lm_email'], $_POST['lm_license']);
-        echo "<div class='updated'><p>License added successfully!</p></div>";
-    }
-
-    // Process importing licenses from CSV
-    if (isset($_POST['lm_import_csv'])) {
-        if (!wp_verify_nonce($_POST['lm_import_csv_nonce'], 'lm_import_csv_action')) {
-            die('Security check failed');
-        }
-        if (!empty($_FILES['lm_csv_file']['tmp_name'])) {
-            $file = $_FILES['lm_csv_file']['tmp_name'];
-            if (mime_content_type($file) === 'text/plain' || mime_content_type($file) === 'text/csv') {
-                if (($handle = fopen($file, 'r')) !== FALSE) {
-                    while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                        if (count($data) == 2) {
-                            lm_add_license($data[0], $data[1]);
-                        }
-                    }
-                    fclose($handle);
-                    echo "<div class='updated'><p>Licenses imported successfully!</p></div>";
-                } else {
-                    echo "<div class='error'><p>Failed to open the file.</p></div>";
-                }
-            } else {
-                echo "<div class='error'><p>Invalid file type. Please upload a CSV file.</p></div>";
-            }
-        }
-    }
 }
