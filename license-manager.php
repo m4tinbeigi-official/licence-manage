@@ -98,6 +98,12 @@ function lm_admin_page() {
             <input type="file" name="lm_csv_file" accept=".csv" required>
             <input type="submit" name="lm_import_csv" value="Import Licenses" class="button button-primary">
         </form>
+
+        <h2>Download Sample CSV</h2>
+        <p>
+            You can download a sample CSV file to help you format your license data:
+            <a href="<?php echo plugin_dir_url(__FILE__) . 'sample.csv'; ?>" class="button">Download Sample CSV</a>
+        </p>
     </div>
     <?php
 
